@@ -554,22 +554,31 @@ function autoDetectStyle() {
   const midC = bandColor(minY + Math.floor(bboxH * 0.42), minY + Math.floor(bboxH * 0.58));
   const botC = bandColor(maxY - Math.max(1, Math.floor(bboxH * 0.18)), maxY);
 
-  // 4. Stroke detection: find darkest pixels at the boundary of the text shape
+  // 4. Build foreground mask + boundary edge list
+  const fgMask = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (isFg(getPx(x, y))) fgMask[y * w + x] = 1;
+    }
+  }
+  const edgePixels = [];
   const edgeColors = [];
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      const c = getPx(x, y);
-      if (!isFg(c)) continue;
-      // 4-neighbor: if any neighbor is bg, this is an edge pixel
-      const neighbors = [
-        x > 0 ? getPx(x-1, y) : bg,
-        x < w-1 ? getPx(x+1, y) : bg,
-        y > 0 ? getPx(x, y-1) : bg,
-        y < h-1 ? getPx(x, y+1) : bg
-      ];
-      if (neighbors.some(n => !isFg(n))) edgeColors.push(c);
+      if (!fgMask[y * w + x]) continue;
+      const hasBgNeighbor =
+        (x > 0 && !fgMask[y*w + x - 1]) ||
+        (x < w-1 && !fgMask[y*w + x + 1]) ||
+        (y > 0 && !fgMask[(y-1)*w + x]) ||
+        (y < h-1 && !fgMask[(y+1)*w + x]);
+      if (hasBgNeighbor) {
+        edgePixels.push([x, y]);
+        edgeColors.push(getPx(x, y));
+      }
     }
   }
+
+  // 5. Stroke detection: darkest interior-edge pixels
   let strokeHex = null;
   let strokeThickness = 0;
   if (edgeColors.length > 20) {
@@ -577,17 +586,80 @@ function autoDetectStyle() {
     const darkest = edgeColors.slice(0, Math.max(10, Math.floor(edgeColors.length * 0.08)));
     const ds = avg(darkest);
     const dsLum = ds[0] + ds[1] + ds[2];
-    // Compare to bottom-band color (typically darker side of gradient)
     const botRGB = botC ? [parseInt(botC.slice(1,3),16), parseInt(botC.slice(3,5),16), parseInt(botC.slice(5,7),16)] : ds;
     const botLum = botRGB[0] + botRGB[1] + botRGB[2];
-    // Stroke must be meaningfully darker than the darker fill stop
     if (dsLum < botLum - 60) {
       strokeHex = rgbToHex(ds[0], ds[1], ds[2]);
       strokeThickness = Math.max(2, Math.round(bboxH * 0.025));
     }
   }
 
-  // 5. Apply detected values
+  // 6. Drop-shadow detection
+  // For each candidate angle, sample pixels at a few distances OUTSIDE the text shape,
+  // measure how much darker than bg they are. Best angle/distance = shadow direction.
+  let shadow = null;
+  if (edgePixels.length > 30) {
+    const angleSteps = 16;
+    const probeDistances = [
+      Math.max(4, Math.round(bboxH * 0.025)),
+      Math.max(6, Math.round(bboxH * 0.05)),
+      Math.max(10, Math.round(bboxH * 0.08))
+    ];
+    const bgLum = bg[0] + bg[1] + bg[2];
+    const minProbe = strokeThickness * 2 + 2; // skip past stroke
+    let best = { score: -Infinity };
+
+    for (let i = 0; i < angleSteps; i++) {
+      const angle = (i / angleSteps) * Math.PI * 2;
+      const dxu = Math.cos(angle), dyu = Math.sin(angle);
+      for (const d of probeDistances) {
+        if (d < minProbe) continue;
+        let darknessSum = 0, count = 0;
+        for (const [ex, ey] of edgePixels) {
+          const nx = Math.round(ex + dxu * d);
+          const ny = Math.round(ey + dyu * d);
+          if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+          if (fgMask[ny * w + nx]) continue; // still on text
+          const c = getPx(nx, ny);
+          const darkness = bgLum - (c[0] + c[1] + c[2]);
+          if (darkness > 0) { darknessSum += darkness; count++; }
+        }
+        if (count < 30) continue;
+        const avgDark = darknessSum / count;
+        const coverage = count / edgePixels.length;
+        const score = avgDark * coverage;
+        if (score > best.score) best = { score, angle, distance: d, avgDark, coverage };
+      }
+    }
+
+    // Threshold: needs both meaningful darkening AND meaningful coverage
+    if (best.score !== -Infinity && best.avgDark > 25 && best.coverage > 0.25) {
+      // Sample shadow color near the best probe
+      const dxu = Math.cos(best.angle), dyu = Math.sin(best.angle);
+      const samples = [];
+      for (const [ex, ey] of edgePixels) {
+        const nx = Math.round(ex + dxu * best.distance);
+        const ny = Math.round(ey + dyu * best.distance);
+        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+        if (fgMask[ny * w + nx]) continue;
+        samples.push(getPx(nx, ny));
+      }
+      if (samples.length > 5) {
+        samples.sort((a,b) => (a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
+        const darkest = samples.slice(0, Math.max(5, Math.floor(samples.length * 0.25)));
+        const sc = avg(darkest);
+        shadow = {
+          color: rgbToHex(sc[0], sc[1], sc[2]),
+          angle: +best.angle.toFixed(3),
+          distance: best.distance,
+          blur: Math.max(2, Math.round(best.distance * 0.6)),
+          alpha: Math.min(1, +(best.avgDark / 180).toFixed(2))
+        };
+      }
+    }
+  }
+
+  // 7. Apply detected values
   state.fillStops = [
     { color: topC || '#ffffff', stop: 0 },
     { color: midC || topC || '#888888', stop: 0.5 },
@@ -604,9 +676,23 @@ function autoDetectStyle() {
     $('strokeEnabled').checked = false;
   }
 
+  if (shadow) {
+    $('shadowEnabled').checked = true;
+    $('shadowColor').value = shadow.color;
+    $('shadowAngle').value = shadow.angle;
+    $('shadowDistance').value = shadow.distance;
+    $('shadowBlur').value = shadow.blur;
+    $('shadowAlpha').value = shadow.alpha;
+  } else {
+    $('shadowEnabled').checked = false;
+  }
+
   renderFillStops();
   updatePixi();
-  toast(`Detected ${strokeHex ? 'gradient + stroke' : 'gradient'}`);
+  const parts = ['gradient'];
+  if (strokeHex) parts.push('stroke');
+  if (shadow) parts.push('shadow');
+  toast(`Detected ${parts.join(' + ')}`);
 }
 
 refCanvas.addEventListener('click', e => {
