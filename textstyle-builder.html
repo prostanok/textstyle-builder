@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PixiJS TextStyle Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Montserrat:wght@100;200;300;400;500;600;700;800;900&family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Roboto:wght@100;300;400;500;700;900&family=Bebas+Neue&family=Oswald:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1115;
+  --panel: #1a1d24;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --muted: #8a92a3;
+  --accent: #6aa9ff;
+  --danger: #ff6b6b;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+header p { margin: 0; color: var(--muted); font-size: 12px; }
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr 360px;
+  overflow: hidden;
+  min-height: 0;
+}
+aside, section { overflow: auto; padding: 16px; min-height: 0; }
+aside.controls { border-right: 1px solid var(--border); }
+aside.output { border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 18px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.section-title:first-child { margin-top: 0; }
+.field {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.field label { color: var(--muted); }
+.field input[type="text"], .field input[type="number"], .field select, .field input[type="color"] {
+  width: 100%;
+  padding: 5px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field input[type="color"] { padding: 2px; height: 28px; cursor: pointer; }
+.field.full { grid-template-columns: 1fr; }
+.gradient-stops .stop {
+  display: grid;
+  grid-template-columns: 20px 40px 1fr 24px;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+.gradient-stops .stop > span { color: var(--muted); font-size: 11px; text-align: center; }
+button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  transition: all 0.12s;
+}
+button:hover { background: #232732; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0a; font-weight: 500; }
+button.primary:hover { background: #84b8ff; }
+button.danger { background: transparent; color: var(--danger); border-color: transparent; padding: 4px 6px; }
+button.danger:hover { background: rgba(255,107,107,0.1); }
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.dropzone:hover, .dropzone.dragging {
+  border-color: var(--accent);
+  background: rgba(106,169,255,0.05);
+  color: var(--text);
+}
+.dropzone p { margin: 4px 0; }
+.dropzone .small { font-size: 11px; color: var(--muted); }
+#refCanvasWrap { position: relative; display: inline-block; max-width: 100%; margin-top: 8px; }
+#refCanvas { max-width: 100%; display: block; cursor: crosshair; border: 1px solid var(--border); border-radius: 4px; }
+.preview-area { margin-top: 24px; }
+#pixiContainer {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 0;
+}
+#pixiContainer canvas { display: block; max-width: 100%; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
+.targets { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 12px; }
+.targets button { font-size: 11px; padding: 4px 8px; }
+.targets button.active { background: var(--accent); border-color: var(--accent); color: #0a0a0a; }
+pre {
+  background: #0a0c10;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  overflow: auto;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  margin: 0;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.button-row { display: flex; gap: 8px; margin-top: 12px; flex-shrink: 0; }
+.button-row button { flex: 1; }
+.checkbox-field { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.checkbox-field input[type="checkbox"] { accent-color: var(--accent); }
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #0a0a0a;
+  padding: 8px 16px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  font-weight: 500;
+  z-index: 99;
+}
+.toast.show { opacity: 1; }
+.toolbar {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+.toolbar button { font-size: 11px; padding: 4px 8px; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PixiJS TextStyle Builder</h1>
+  <p>Drop a screenshot · tweak controls · export JSON for <a href="https://text-style.pixijs.io/" target="_blank">text-style.pixijs.io</a></p>
+</header>
+
+<main>
+
+  <!-- LEFT: CONTROLS -->
+  <aside class="controls">
+    <div class="section-title">Sample</div>
+    <div class="field full">
+      <input type="text" id="text" value="1" placeholder="Text to render">
+    </div>
+    <div class="checkbox-field">
+      <input type="color" id="bgColor" value="#ffffff" style="width:36px; height:24px; padding:1px;">
+      <label for="bgColor" style="color: var(--muted);">Preview background</label>
+    </div>
+
+    <div class="section-title">Font</div>
+    <div class="field"><label>Family</label><input type="text" id="fontFamily" value="Poppins"></div>
+    <div class="field"><label>Size</label><input type="number" id="fontSize" value="200" min="1"></div>
+    <div class="field">
+      <label>Weight</label>
+      <select id="fontWeight">
+        <option>100</option><option>200</option><option>300</option>
+        <option selected>400</option>
+        <option>500</option><option>600</option><option>700</option>
+        <option>800</option><option>900</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Style</label>
+      <select id="fontStyle">
+        <option value="normal" selected>Normal</option>
+        <option value="italic">Italic</option>
+      </select>
+    </div>
+    <div class="field"><label>Letter spacing</label><input type="number" id="letterSpacing" value="0"></div>
+    <div class="field"><label>Line height</label><input type="number" id="lineHeight" value="240"></div>
+    <div class="field">
+      <label>Align</label>
+      <select id="align">
+        <option value="left" selected>Left</option>
+        <option value="center">Center</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+
+    <div class="section-title">Fill</div>
+    <div class="field">
+      <label>Type</label>
+      <select id="fillType">
+        <option value="solid">Solid</option>
+        <option value="vertical" selected>Linear (vertical)</option>
+        <option value="horizontal">Linear (horizontal)</option>
+      </select>
+    </div>
+    <div id="fillStops" class="gradient-stops"></div>
+    <button id="addStopBtn" style="font-size:11px; margin-top:4px;">+ Add stop</button>
+
+    <div class="section-title">Stroke</div>
+    <div class="checkbox-field">
+      <input type="checkbox" id="strokeEnabled">
+      <label for="strokeEnabled">Enabled</label>
+    </div>
+    <div class="field"><label>Color</label><input type="color" id="strokeColor" value="#3a0a0a"></div>
+    <div class="field"><label>Thickness</label><input type="number" id="strokeThickness" value="6" min="0"></div>
+    <div class="field">
+      <label>Line join</label>
+      <select id="lineJoin">
+        <option value="miter">Miter</option>
+        <option value="round" selected>Round</option>
+        <option value="bevel">Bevel</option>
+      </select>
+    </div>
+
+    <div class="section-title">Drop Shadow</div>
+    <div class="checkbox-field">
+      <input type="checkbox" id="shadowEnabled">
+      <label for="shadowEnabled">Enabled</label>
+    </div>
+    <div class="field"><label>Color</label><input type="color" id="shadowColor" value="#000000"></div>
+    <div class="field"><label>Alpha</label><input type="number" id="shadowAlpha" value="0.5" min="0" max="1" step="0.05"></div>
+    <div class="field"><label>Angle (rad)</label><input type="number" id="shadowAngle" value="0.5" step="0.1"></div>
+    <div class="field"><label>Distance</label><input type="number" id="shadowDistance" value="5" min="0"></div>
+    <div class="field"><label>Blur</label><input type="number" id="shadowBlur" value="4" min="0"></div>
+  </aside>
+
+  <!-- CENTER: REFERENCE + PREVIEW -->
+  <section class="middle">
+    <div class="section-title">Reference image</div>
+    <div id="dropzone" class="dropzone">
+      <p><b>Click to upload</b> · drop · or paste (⌘V / Ctrl+V)</p>
+      <p class="small">PNG / JPG / WebP — used for color picking</p>
+      <input type="file" accept="image/*" hidden id="fileInput">
+    </div>
+    <div id="refCanvasWrap" style="display:none;">
+      <div class="toolbar">
+        <button id="autoDetectBtn" class="primary" style="background:var(--accent); color:#0a0a0a;">⚡ Auto-detect style</button>
+        <button id="changeImgBtn">Change image</button>
+        <button id="clearImgBtn">Clear</button>
+      </div>
+      <canvas id="refCanvas"></canvas>
+      <p class="hint">Or click a pixel on the image to send its color to:</p>
+      <div class="targets" id="pickTargets">
+        <button data-target="fillStop:0" class="active">Fill 1</button>
+        <button data-target="fillStop:1">Fill 2</button>
+        <button data-target="fillStop:2">Fill 3</button>
+        <button data-target="stroke">Stroke</button>
+        <button data-target="shadow">Shadow</button>
+        <button data-target="bg">BG</button>
+      </div>
+    </div>
+
+    <div class="section-title preview-area">PixiJS preview</div>
+    <div id="pixiContainer"></div>
+  </section>
+
+  <!-- RIGHT: JSON -->
+  <aside class="output">
+    <div class="section-title" style="margin-top:0;">JSON output</div>
+    <pre id="jsonOutput"></pre>
+    <div class="button-row">
+      <button id="copyBtn" class="primary">Copy</button>
+      <button id="downloadBtn">Download</button>
+    </div>
+    <p class="hint" style="margin-top:14px;">
+      Upload the file at <a href="https://text-style.pixijs.io/" target="_blank">text-style.pixijs.io</a> to verify.
+    </p>
+  </aside>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== State =====
+const state = {
+  fillStops: [
+    { color: '#ffd9c7', stop: 0 },
+    { color: '#a52828', stop: 0.65 },
+    { color: '#5a1414', stop: 1 }
+  ],
+  pickTarget: 'fillStop:0'
+};
+
+const $ = id => document.getElementById(id);
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove('show'), 1400);
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+// ===== Build TextStyle JSON =====
+function buildStyle() {
+  const style = {
+    fontFamily: $('fontFamily').value || 'Arial',
+    fontSize: +$('fontSize').value,
+    fontWeight: $('fontWeight').value,
+    fontStyle: $('fontStyle').value,
+    align: $('align').value,
+    letterSpacing: +$('letterSpacing').value,
+    lineHeight: +$('lineHeight').value
+  };
+
+  const fillType = $('fillType').value;
+  if (fillType === 'solid' || state.fillStops.length === 1) {
+    style.fill = state.fillStops[0].color;
+  } else {
+    style.fill = state.fillStops.map(s => s.color);
+    style.fillGradientType = fillType === 'horizontal' ? 1 : 0;
+    style.fillGradientStops = state.fillStops.map(s => +s.stop);
+  }
+
+  if ($('strokeEnabled').checked) {
+    style.stroke = $('strokeColor').value;
+    style.strokeThickness = +$('strokeThickness').value;
+    style.lineJoin = $('lineJoin').value;
+  }
+
+  if ($('shadowEnabled').checked) {
+    style.dropShadow = true;
+    style.dropShadowColor = $('shadowColor').value;
+    style.dropShadowAlpha = +$('shadowAlpha').value;
+    style.dropShadowAngle = +$('shadowAngle').value;
+    style.dropShadowDistance = +$('shadowDistance').value;
+    style.dropShadowBlur = +$('shadowBlur').value;
+  }
+
+  return style;
+}
+
+// ===== PixiJS preview =====
+let pixiApp, pixiText;
+function initPixi() {
+  pixiApp = new PIXI.Application({
+    width: 600,
+    height: 360,
+    backgroundColor: 0xffffff,
+    antialias: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true
+  });
+  $('pixiContainer').appendChild(pixiApp.view);
+  pixiText = new PIXI.Text('', {});
+  pixiText.anchor.set(0.5);
+  pixiApp.stage.addChild(pixiText);
+}
+function updatePixi() {
+  if (!pixiApp) return;
+  const style = buildStyle();
+  pixiText.text = $('text').value || ' ';
+  pixiText.style = new PIXI.TextStyle(style);
+
+  // Auto-fit large text
+  const maxW = pixiApp.screen.width - 40;
+  const maxH = pixiApp.screen.height - 40;
+  const tw = pixiText.width || 1;
+  const th = pixiText.height || 1;
+  const fit = Math.min(1, maxW / tw, maxH / th);
+  pixiText.scale.set(fit);
+  pixiText.x = pixiApp.screen.width / 2;
+  pixiText.y = pixiApp.screen.height / 2;
+
+  // BG
+  const bg = $('bgColor').value;
+  pixiApp.renderer.background.color = parseInt(bg.slice(1), 16);
+
+  // JSON
+  $('jsonOutput').textContent = JSON.stringify(style, null, 2);
+}
+
+// ===== Fill stops UI =====
+function renderFillStops() {
+  const container = $('fillStops');
+  container.innerHTML = '';
+  state.fillStops.forEach((stop, i) => {
+    const div = document.createElement('div');
+    div.className = 'stop';
+    div.innerHTML = `
+      <span>${i+1}</span>
+      <input type="color" value="${stop.color}" data-i="${i}" data-prop="color">
+      <input type="number" value="${stop.stop}" data-i="${i}" data-prop="stop" min="0" max="1" step="0.05">
+      <button class="danger" data-remove="${i}" title="Remove stop">×</button>
+    `;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('input').forEach(el => {
+    el.addEventListener('input', e => {
+      const i = +e.target.dataset.i;
+      const prop = e.target.dataset.prop;
+      state.fillStops[i][prop] = prop === 'stop' ? +e.target.value : e.target.value;
+      updatePixi();
+    });
+  });
+  container.querySelectorAll('button[data-remove]').forEach(el => {
+    el.addEventListener('click', e => {
+      const i = +e.currentTarget.dataset.remove;
+      if (state.fillStops.length > 1) {
+        state.fillStops.splice(i, 1);
+        renderFillStops();
+        updatePixi();
+      } else {
+        toast('Need at least one stop');
+      }
+    });
+  });
+}
+
+// ===== Reference image / eyedropper =====
+const refCanvas = $('refCanvas');
+const refCtx = refCanvas.getContext('2d', { willReadFrequently: true });
+let refImg = null;
+
+function loadImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    toast('Please drop an image file');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 540;
+      const scale = Math.min(1, maxW / img.width);
+      refCanvas.width = img.width * scale;
+      refCanvas.height = img.height * scale;
+      refCtx.drawImage(img, 0, 0, refCanvas.width, refCanvas.height);
+      refImg = img;
+      $('refCanvasWrap').style.display = 'block';
+      $('dropzone').style.display = 'none';
+      // Auto-run detection on every new image
+      autoDetectStyle();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== Auto-detect style from the loaded image =====
+function autoDetectStyle() {
+  if (!refImg) return;
+  const w = refCanvas.width, h = refCanvas.height;
+  const data = refCtx.getImageData(0, 0, w, h).data;
+
+  const getPx = (x, y) => {
+    const i = (y * w + x) * 4;
+    return [data[i], data[i+1], data[i+2], data[i+3]];
+  };
+  const dist = (a, b) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+  const avg = arr => arr.reduce((a,c) => [a[0]+c[0], a[1]+c[1], a[2]+c[2]], [0,0,0])
+    .map(v => Math.round(v / arr.length));
+
+  // 1. Background = average of corners + edges
+  const samplePts = [
+    [0,0],[w-1,0],[0,h-1],[w-1,h-1],
+    [Math.floor(w/2),0],[Math.floor(w/2),h-1],
+    [0,Math.floor(h/2)],[w-1,Math.floor(h/2)]
+  ];
+  const bg = avg(samplePts.map(([x,y]) => getPx(x,y)));
+  const bgHex = rgbToHex(bg[0], bg[1], bg[2]);
+
+  // 2. Text bbox: any pixel sufficiently different from bg
+  const isFg = c => c[3] > 50 && dist(c, bg) > 35;
+  let minX=w, minY=h, maxX=0, maxY=0, fgCount=0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (isFg(getPx(x, y))) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        fgCount++;
+      }
+    }
+  }
+  if (fgCount < 50 || maxX <= minX || maxY <= minY) {
+    toast('Could not detect text in image');
+    return;
+  }
+  const bboxH = maxY - minY;
+  const bboxW = maxX - minX;
+
+  // 3. Sample band color: take pixels in y-range, sort by luminance, take median window
+  function bandColor(y0, y1) {
+    const cols = [];
+    for (let y = y0; y <= y1; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const c = getPx(x, y);
+        if (isFg(c)) cols.push(c);
+      }
+    }
+    if (cols.length < 5) return null;
+    cols.sort((a,b) => (a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
+    // Median 40-60% slice → representative non-edge interior
+    const a = Math.floor(cols.length * 0.4);
+    const b = Math.max(a + 1, Math.floor(cols.length * 0.6));
+    const slice = cols.slice(a, b);
+    const m = avg(slice);
+    return rgbToHex(m[0], m[1], m[2]);
+  }
+
+  const topC = bandColor(minY, minY + Math.max(1, Math.floor(bboxH * 0.18)));
+  const midC = bandColor(minY + Math.floor(bboxH * 0.42), minY + Math.floor(bboxH * 0.58));
+  const botC = bandColor(maxY - Math.max(1, Math.floor(bboxH * 0.18)), maxY);
+
+  // 4. Stroke detection: find darkest pixels at the boundary of the text shape
+  const edgeColors = [];
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const c = getPx(x, y);
+      if (!isFg(c)) continue;
+      // 4-neighbor: if any neighbor is bg, this is an edge pixel
+      const neighbors = [
+        x > 0 ? getPx(x-1, y) : bg,
+        x < w-1 ? getPx(x+1, y) : bg,
+        y > 0 ? getPx(x, y-1) : bg,
+        y < h-1 ? getPx(x, y+1) : bg
+      ];
+      if (neighbors.some(n => !isFg(n))) edgeColors.push(c);
+    }
+  }
+  let strokeHex = null;
+  let strokeThickness = 0;
+  if (edgeColors.length > 20) {
+    edgeColors.sort((a,b) => (a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
+    const darkest = edgeColors.slice(0, Math.max(10, Math.floor(edgeColors.length * 0.08)));
+    const ds = avg(darkest);
+    const dsLum = ds[0] + ds[1] + ds[2];
+    // Compare to bottom-band color (typically darker side of gradient)
+    const botRGB = botC ? [parseInt(botC.slice(1,3),16), parseInt(botC.slice(3,5),16), parseInt(botC.slice(5,7),16)] : ds;
+    const botLum = botRGB[0] + botRGB[1] + botRGB[2];
+    // Stroke must be meaningfully darker than the darker fill stop
+    if (dsLum < botLum - 60) {
+      strokeHex = rgbToHex(ds[0], ds[1], ds[2]);
+      strokeThickness = Math.max(2, Math.round(bboxH * 0.025));
+    }
+  }
+
+  // 5. Apply detected values
+  state.fillStops = [
+    { color: topC || '#ffffff', stop: 0 },
+    { color: midC || topC || '#888888', stop: 0.5 },
+    { color: botC || '#000000', stop: 1 }
+  ];
+  $('fillType').value = 'vertical';
+  $('bgColor').value = bgHex;
+
+  if (strokeHex) {
+    $('strokeEnabled').checked = true;
+    $('strokeColor').value = strokeHex;
+    $('strokeThickness').value = strokeThickness;
+  } else {
+    $('strokeEnabled').checked = false;
+  }
+
+  renderFillStops();
+  updatePixi();
+  toast(`Detected ${strokeHex ? 'gradient + stroke' : 'gradient'}`);
+}
+
+refCanvas.addEventListener('click', e => {
+  if (!refImg) return;
+  const rect = refCanvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) * (refCanvas.width / rect.width));
+  const y = Math.floor((e.clientY - rect.top) * (refCanvas.height / rect.height));
+  const data = refCtx.getImageData(x, y, 1, 1).data;
+  const hex = rgbToHex(data[0], data[1], data[2]);
+  applyPickedColor(hex);
+});
+
+function applyPickedColor(hex) {
+  const target = state.pickTarget;
+  if (target.startsWith('fillStop:')) {
+    const i = +target.split(':')[1];
+    if (i >= state.fillStops.length) {
+      const newStop = state.fillStops.length === 0 ? 0 : 1;
+      state.fillStops.push({ color: hex, stop: newStop });
+    } else {
+      state.fillStops[i].color = hex;
+    }
+    renderFillStops();
+    if ($('fillType').value === 'solid' && state.fillStops.length > 1) {
+      $('fillType').value = 'vertical';
+    }
+  } else if (target === 'stroke') {
+    $('strokeColor').value = hex;
+    $('strokeEnabled').checked = true;
+  } else if (target === 'shadow') {
+    $('shadowColor').value = hex;
+    $('shadowEnabled').checked = true;
+  } else if (target === 'bg') {
+    $('bgColor').value = hex;
+  }
+  toast(`${hex} → ${target}`);
+  updatePixi();
+}
+
+// ===== Wire it all up =====
+function init() {
+  initPixi();
+  renderFillStops();
+
+  // ----- File input + dropzone -----
+  const dz = $('dropzone');
+  const fi = $('fileInput');
+  dz.addEventListener('click', () => fi.click());
+  fi.addEventListener('change', e => { if (e.target.files[0]) loadImageFile(e.target.files[0]); });
+
+  // Suppress the browser's default "open the file" behavior across the whole page
+  // so a drop on (or near) the dropzone is captured by us instead.
+  ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+    window.addEventListener(ev, e => e.preventDefault(), false);
+  });
+
+  // Visual feedback on the dropzone
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, () => dz.classList.add('dragging')));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, () => dz.classList.remove('dragging')));
+
+  // Accept drop anywhere on the page
+  window.addEventListener('drop', e => {
+    if (!e.dataTransfer) return;
+    const file = [...e.dataTransfer.files].find(f => f.type.startsWith('image/'));
+    if (file) {
+      loadImageFile(file);
+    } else {
+      // Try item.getAsFile() as a fallback
+      for (const item of e.dataTransfer.items || []) {
+        if (item.kind === 'file') {
+          const f = item.getAsFile();
+          if (f && f.type.startsWith('image/')) { loadImageFile(f); return; }
+        }
+      }
+    }
+  });
+
+  // ----- Paste image from clipboard -----
+  window.addEventListener('paste', e => {
+    const items = (e.clipboardData || window.clipboardData)?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          loadImageFile(file);
+          e.preventDefault();
+          toast('Pasted image');
+          return;
+        }
+      }
+    }
+  });
+
+  // Auto-detect button
+  $('autoDetectBtn').addEventListener('click', autoDetectStyle);
+
+  // Change / Clear
+  $('changeImgBtn').addEventListener('click', () => fi.click());
+  $('clearImgBtn').addEventListener('click', () => {
+    refImg = null;
+    refCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
+    $('refCanvasWrap').style.display = 'none';
+    $('dropzone').style.display = 'block';
+    fi.value = '';
+  });
+
+  // Pick targets
+  $('pickTargets').querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('pickTargets').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.pickTarget = btn.dataset.target;
+    });
+  });
+
+  // Add stop
+  $('addStopBtn').addEventListener('click', () => {
+    const last = state.fillStops[state.fillStops.length - 1] || { color: '#ffffff', stop: 0 };
+    state.fillStops.push({ color: last.color, stop: 1 });
+    renderFillStops();
+    updatePixi();
+  });
+
+  // Any input change
+  document.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('input', updatePixi);
+    el.addEventListener('change', updatePixi);
+  });
+
+  // Copy / Download
+  $('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText($('jsonOutput').textContent)
+      .then(() => toast('Copied'))
+      .catch(() => toast('Copy failed'));
+  });
+  $('downloadBtn').addEventListener('click', () => {
+    const blob = new Blob([$('jsonOutput').textContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'text-style.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  updatePixi();
+}
+
+init();
+</script>
+</body>
+</html>
